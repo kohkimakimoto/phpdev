@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+
+if [ "${TERM:-dumb}" != "dumb" ]; then
+    txtunderline=$(tput sgr 0 1)     # Underline
+    txtbold=$(tput bold)             # Bold
+    txtred=$(tput setaf 1)           # red
+    txtgreen=$(tput setaf 2)         # green
+    txtyellow=$(tput setaf 3)        # yellow
+    txtblue=$(tput setaf 4)          # blue
+    txtreset=$(tput sgr0)            # Reset
+else
+    txtunderline=""
+    txtbold=""
+    txtred=""
+    txtgreen=""
+    txtyellow=""
+    txtblue=$""
+    txtreset=""
+fi
+
+abort() {
+  { if [ "$#" -eq 0 ]; then cat -
+    else echo "${txtred}${progname}: $*${txtreset}"
+    fi
+  } >&2
+  exit 1
+}
+
+if [ -z "${PHPDEV_ROOT}" ]; then
+  PHPDEV_ROOT="$(pwd)/.phpdev"
+else
+  PHPDEV_ROOT="${PHPDEV_ROOT%/}"
+fi
+export PHPDEV_ROOT
+
+set -eu
+progname=$(basename $0)
+extname=""
+
+usage() {
+    cat << EOF
+Usage: $progname [OPTIONS] COMMAND
+
+Options:
+  -h, --help         show help.
+
+Commands:
+  help        show help.
+  init        initial setup (get php-src).
+  update      update resouces.
+  skeleton    create new extension skeleton.
+
+EOF
+}
+
+setup_phpdev_root () {
+    if [ ! -e "$PHPDEV_ROOT" ]; then
+        mkdir "$PHPDEV_ROOT"
+    fi
+}
+
+# parse arguments and options.
+declare -a params=()
+for OPT in "$@"
+do
+    case "$OPT" in
+        '-h'|'--help' )
+            usage
+            exit 0
+            ;;
+        '--extname' )
+            if [[ -z "${2:-}" ]] || [[ "${2:-}" =~ ^-+ ]]; then
+                abort "option '$1' requires an argument." 1>&2
+                exit 1
+            fi
+            extname="$2"
+            shift 2
+            ;;
+        '--'|'-' )
+            shift 1
+            params+=( "$@" )
+            break
+            ;;
+        -*)
+            abort "illegal option -- '$(echo $1 | sed 's/^-*//')'"
+            ;;
+        *)
+            if [[ ! -z "${1:-}" ]] && [[ ! "${1:-}" =~ ^-+ ]]; then
+                params+=( "$1" )
+                shift 1
+            fi
+            ;;
+    esac
+done
+
+command="" && [ ${#params[@]} -ne 0 ] && command=${params[0]}
+case $command in
+    'help' )
+        usage
+        ;;
+    'init'|'update' )
+        # get php-src
+        setup_phpdev_root
+        if [ -d "$PHPDEV_ROOT/php-src" ]; then
+            cd "$PHPDEV_ROOT/php-src"
+            git pull origin
+        else
+            git clone https://github.com/php/php-src.git "$PHPDEV_ROOT/php-src"
+        fi
+        ;;
+    'skeleton' )
+        if [ -z "$extname" ]; then
+            abort "require --extname option"
+        fi
+
+        echo "creating '$extname'..."
+        php_version_tag="php-$(phpenv global)"
+
+        cd "$PHPDEV_ROOT/php-src"
+        git checkout -f "$php_version_tag"
+        cd -
+
+        $PHPDEV_ROOT/php-src/ext/ext_skel --extname=$extname --skel=$PHPDEV_ROOT/php-src/ext/skeleton
+        ;;
+    '' )
+        usage
+        ;;
+    *)
+        abort "illegal command '$command'"
+        ;;
+esac
