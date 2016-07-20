@@ -113,6 +113,10 @@ case $command in
             abort "require --extname option"
         fi
 
+        if [ -d "$PHPDEV_ROOT" ]; then
+            abort "not found $PHPDEV_ROOT"
+        fi
+
         echo "creating '$extname'..."
         php_version_tag="php-$(phpenv global)"
 
