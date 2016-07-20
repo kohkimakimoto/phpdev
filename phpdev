@@ -113,7 +113,7 @@ case $command in
             abort "require --extname option"
         fi
 
-        if [ -d "$PHPDEV_ROOT" ]; then
+        if [ ! -d "$PHPDEV_ROOT" ]; then
             abort "not found $PHPDEV_ROOT"
         fi
 
